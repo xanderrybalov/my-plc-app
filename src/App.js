@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import useStore from './store';
 
 function App() {
     const styles = {
@@ -37,65 +38,110 @@ function App() {
             padding: '8px',
         },
     };
-    const [takt, setTakt] = useState([]);
-    const [sensors, setSensors] = useState([]);
-    const [mechanisms, setMechanisms] = useState([]);
-    const [action, setAction] = useState('');
+
+    const {
+        takt,
+        sensors,
+        mechanisms,
+        sensorStates,
+        mechanismStates,
+        addTakt,
+        addSensor,
+        addMechanism,
+        updateSensorState,
+        updateMechanismState,
+        reset,
+    } = useStore();
+
+    const [actionInput, setActionInput] = useState('');
     const [sensorInput, setSensorInput] = useState('');
     const [mechanismInput, setMechanismInput] = useState('');
-    const [sensorStates, setSensorStates] = useState({});
-    const [mechanismStates, setMechanismStates] = useState({});
 
+    // Function to handle adding a new takt and actionInput
     const handleAddTakt = () => {
-        const newTakt = { id: takt.length + 1, action };
-        setTakt([...takt, newTakt]);
-        setAction(''); // Clear the input field after adding
+        if (actionInput.trim()) {
+            addTakt({ id: takt.length + 1, actionInput: actionInput });
+            setActionInput(''); // Clear the actionInput input field after adding
+        }
     };
 
+    // Function to handle adding a new sensor
     const handleAddSensor = () => {
-        const newSensor = sensorInput.trim();
-        if (newSensor && !sensors.includes(newSensor)) {
-            setSensors([...sensors, newSensor]);
+        if (sensorInput.trim() && !sensors.includes(sensorInput)) {
+            addSensor(sensorInput);
+            setSensorInput(''); // Clear the sensor input field
         }
-        setSensorInput(''); // Clear the input field after adding
     };
 
+    // Function to handle adding a new mechanism
     const handleAddMechanism = () => {
-        const newMechanism = mechanismInput.trim();
-        if (newMechanism && !mechanisms.includes(newMechanism)) {
-            setMechanisms([...mechanisms, newMechanism]);
+        if (mechanismInput.trim() && !mechanisms.includes(mechanismInput)) {
+            addMechanism(mechanismInput);
+            setMechanismInput(''); // Clear the mechanism input field
         }
-        setMechanismInput(''); // Clear the input field after adding
     };
 
-    // Handler to update sensor state for a takt
-    const updateSensorState = (taktId, sensorName, value) => {
-        setSensorStates((prev) => ({
-            ...prev,
-            [taktId]: {
-                ...prev[taktId],
-                [sensorName]: value,
-            },
-        }));
+    // Function to reset all states
+    const handleReset = () => {
+        reset(); // This will reset all states in the zustand store
     };
 
-    // Handler to update mechanism state for a takt
-    const updateMechanismState = (taktId, mechanismName, value) => {
-        setMechanismStates((prev) => ({
-            ...prev,
-            [taktId]: {
-                ...prev[taktId],
-                [mechanismName]: value,
-            },
-        }));
+    const handleExportToJson = () => {
+        const data = {
+            takt,
+            sensors,
+            mechanisms,
+            sensorStates,
+            mechanismStates,
+        };
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const href = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = 'table_data.json';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleFileSelect = async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = JSON.parse(e.target.result);
+                reset(); // Reset current state before importing new data
+
+                // Directly set the state to the imported data
+                useStore.setState({
+                    takt: data.takt,
+                    sensors: data.sensors,
+                    mechanisms: data.mechanisms,
+                    sensorStates: data.sensorStates,
+                    mechanismStates: data.mechanismStates,
+                });
+            };
+            reader.readAsText(file);
+        }
     };
 
     return (
         <div>
             <div>
+                <input type="file" onChange={handleFileSelect} />
+            </div>
+            <div>
+                <button onClick={handleExportToJson}>Export to JSON</button>
+            </div>
+            <div>
+                {/* ... (the rest of your inputs and table) */}
+                <button onClick={handleReset}>Reset Table</button>
+            </div>
+            <div>
                 <input
-                    value={action}
-                    onChange={(e) => setAction(e.target.value)}
+                    value={actionInput}
+                    onChange={(e) => setActionInput(e.target.value)}
                     placeholder="Назва Дії"
                 />
                 <button onClick={handleAddTakt}>Добавить Такт и Дію</button>
@@ -138,7 +184,7 @@ function App() {
                         </th>
                     </tr>
                     <tr>
-                        {/* Empty cells for takt and action columns */}
+                        {/* Empty cells for takt and actionInput columns */}
                         <th style={styles.th}></th>
                         <th style={styles.th}></th>
                         {sensors.map((sensor, index) => (
@@ -157,7 +203,7 @@ function App() {
                     {takt.map((t, index) => (
                         <tr key={t.id}>
                             <td style={styles.td}>{t.id}</td>
-                            <td style={styles.td}>{t.action}</td>
+                            <td style={styles.td}>{t.actionInput}</td>
                             {sensors.map((sensor, sensorIndex) => (
                                 <td style={styles.td} key={sensorIndex}>
                                     <select
